@@ -1,9 +1,9 @@
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Testimonial from "@/models/Testimonial";
 import { AppError } from "@/utils/errors";
 
 export async function createTestimonial(payload, user = null) {
-  await connectDb();
+  await connectDB();
   const testimonial = await Testimonial.create({
     userId: user?._id || null,
     name: payload.name || user?.name || "Anonymous",
@@ -15,14 +15,13 @@ export async function createTestimonial(payload, user = null) {
 }
 
 export async function listApprovedTestimonials() {
-  await connectDb();
+  await connectDB();
   return Testimonial.find({ approved: true }).sort({ createdAt: -1 }).lean();
 }
 
 export async function approveTestimonial(id) {
-  await connectDb();
+  await connectDB();
   const updated = await Testimonial.findByIdAndUpdate(id, { approved: true }, { new: true }).lean();
   if (!updated) throw new AppError(404, "Testimonial not found");
   return updated;
 }
-

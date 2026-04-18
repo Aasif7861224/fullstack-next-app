@@ -1,5 +1,5 @@
 import { revalidateTag } from "next/cache";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import { AppError } from "@/utils/errors";
 import { CACHE_TAGS } from "@/lib/constants";
 import { buildPaginationMeta } from "@/lib/pagination";
@@ -20,7 +20,7 @@ async function expireFeaturedListingsForSeller(ownerId) {
 }
 
 export async function getSellerAnalytics(user) {
-  await connectDb();
+  await connectDB();
   await expireFeaturedListingsForSeller(user._id);
 
   const ownerFilter = { ownerId: user._id };
@@ -132,7 +132,7 @@ export async function getSellerAnalytics(user) {
 }
 
 export async function createSellerFeedback(user, payload) {
-  await connectDb();
+  await connectDB();
   const feedback = await SellerFeedback.create({
     sellerId: user._id,
     subject: payload.subject,
@@ -145,7 +145,7 @@ export async function createSellerFeedback(user, payload) {
 }
 
 export async function listSellerFeedback(user, { page, limit, skip, status }) {
-  await connectDb();
+  await connectDB();
   const filter = { sellerId: user._id };
   if (status && status !== "all") {
     filter.status = status;
@@ -161,7 +161,7 @@ export async function listSellerFeedback(user, { page, limit, skip, status }) {
 }
 
 export async function listAdminSellerFeedback({ page, limit, skip, status, priority, q }) {
-  await connectDb();
+  await connectDB();
   const filter = {};
   if (status && status !== "all") {
     filter.status = status;
@@ -194,7 +194,7 @@ export async function listAdminSellerFeedback({ page, limit, skip, status, prior
 }
 
 export async function updateSellerFeedbackByAdmin(id, payload) {
-  await connectDb();
+  await connectDB();
   if (!payload.status && typeof payload.adminReply === "undefined") {
     throw new AppError(400, "status or adminReply is required");
   }

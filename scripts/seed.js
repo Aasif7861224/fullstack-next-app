@@ -1,11 +1,11 @@
 import bcrypt from "bcryptjs";
-import { connectDb } from "../lib/db.js";
+import connectDB from "../lib/db.js";
 import User from "../models/User.js";
 import Property from "../models/Property.js";
 import { ROLE, PROPERTY_STATUS } from "../lib/constants.js";
 
 async function run() {
-  await connectDb();
+  await connectDB();
 
   await Promise.all([User.deleteMany({}), Property.deleteMany({})]);
 

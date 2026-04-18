@@ -1,10 +1,10 @@
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Property from "@/models/Property";
 import Inquiry from "@/models/Inquiry";
 import User from "@/models/User";
 
 export async function getUserDashboardData(userId) {
-  await connectDb();
+  await connectDB();
 
   const [myProperties, myInquiries, user] = await Promise.all([
     Property.find({ ownerId: userId, isDeleted: false }).sort({ createdAt: -1 }).limit(10).lean(),
@@ -18,4 +18,3 @@ export async function getUserDashboardData(userId) {
     savedProperties: user?.savedProperties || [],
   };
 }
-

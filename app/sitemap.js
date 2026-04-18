@@ -1,11 +1,11 @@
 import { env } from "@/lib/env";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Property from "@/models/Property";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap() {
-  await connectDb();
+  await connectDB();
   const properties = await Property.find({ isDeleted: false, status: "active" })
     .select("slug updatedAt")
     .limit(5000)

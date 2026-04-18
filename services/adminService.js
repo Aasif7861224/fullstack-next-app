@@ -1,5 +1,5 @@
 import { revalidateTag } from "next/cache";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Property from "@/models/Property";
 import User from "@/models/User";
 import Inquiry from "@/models/Inquiry";
@@ -43,7 +43,7 @@ async function buildInquiryTrend(days) {
 }
 
 export async function moderatePropertyStatus(id, status) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findOneAndUpdate(
     { _id: id },
     { status, isDeleted: false, deletedAt: null, deletedBy: null },
@@ -58,7 +58,7 @@ export async function moderatePropertyStatus(id, status) {
 }
 
 export async function restoreDeletedProperty(id) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findOneAndUpdate(
     { _id: id, isDeleted: true },
     { isDeleted: false, deletedAt: null, deletedBy: null, status: PROPERTY_STATUS.PENDING },
@@ -73,12 +73,12 @@ export async function restoreDeletedProperty(id) {
 }
 
 export async function listUsers() {
-  await connectDb();
+  await connectDB();
   return User.find().select("-passwordHash").sort({ createdAt: -1 }).lean();
 }
 
 export async function updateUserStatus(id, action) {
-  await connectDb();
+  await connectDB();
   if (action !== "activate" && action !== "deactivate") {
     throw new AppError(400, "Invalid status action");
   }
@@ -92,7 +92,7 @@ export async function updateUserStatus(id, action) {
 }
 
 export async function listAdminProperties({ page, limit, skip, status, deleted, q }) {
-  await connectDb();
+  await connectDB();
   const filter = {};
   if (status && status !== "all") filter.status = status;
   if (deleted === "only") filter.isDeleted = true;
@@ -123,7 +123,7 @@ export async function listAdminProperties({ page, limit, skip, status, deleted, 
 }
 
 export async function listAdminTestimonials({ approved, page, limit, skip }) {
-  await connectDb();
+  await connectDB();
   const filter = {};
   if (approved === "true") filter.approved = true;
   if (approved === "false") filter.approved = false;
@@ -138,7 +138,7 @@ export async function listAdminTestimonials({ approved, page, limit, skip }) {
 }
 
 export async function listAdminInquiries({ page, limit, skip, status, q }) {
-  await connectDb();
+  await connectDB();
   const filter = {};
   if (status && status !== "all") filter.status = status;
   if (q) {
@@ -167,7 +167,7 @@ export async function listAdminInquiries({ page, limit, skip, status, q }) {
 }
 
 export async function getAdminAnalytics() {
-  await connectDb();
+  await connectDB();
 
   const [totalProperties, pendingProperties, activeProperties, rejectedProperties, deletedProperties] =
     await Promise.all([
@@ -288,7 +288,7 @@ export async function getAdminAnalytics() {
 }
 
 export async function getReportsDataset() {
-  await connectDb();
+  await connectDB();
   const analytics = await getAdminAnalytics();
 
   const [properties, inquiries, users, payments, testimonials, sellerFeedback] = await Promise.all([

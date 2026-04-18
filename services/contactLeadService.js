@@ -1,12 +1,12 @@
 import { revalidateTag } from "next/cache";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import { CACHE_TAGS } from "@/lib/constants";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { AppError } from "@/utils/errors";
 import ContactLead from "@/models/ContactLead";
 
 export async function createContactLead(payload) {
-  await connectDb();
+  await connectDB();
   const lead = await ContactLead.create({
     name: payload.name,
     email: payload.email.toLowerCase(),
@@ -21,7 +21,7 @@ export async function createContactLead(payload) {
 }
 
 export async function listAdminContactLeads({ page, limit, skip, status, q }) {
-  await connectDb();
+  await connectDB();
   const filter = {};
   if (status && status !== "all") {
     filter.status = status;
@@ -47,7 +47,7 @@ export async function listAdminContactLeads({ page, limit, skip, status, q }) {
 }
 
 export async function updateContactLeadByAdmin(id, payload) {
-  await connectDb();
+  await connectDB();
   if (!payload.status && typeof payload.adminNote === "undefined") {
     throw new AppError(400, "status or adminNote is required");
   }

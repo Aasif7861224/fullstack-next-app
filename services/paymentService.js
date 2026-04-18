@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Payment from "@/models/Payment";
 import Property from "@/models/Property";
 import { AppError } from "@/utils/errors";
@@ -9,7 +9,7 @@ import { CACHE_TAGS, ROLE } from "@/lib/constants";
 import { getFeaturedTill } from "@/utils/feature";
 
 export async function createFeatureOrder({ propertyId, amount, currency }, user) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findById(propertyId);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -40,7 +40,7 @@ export async function createFeatureOrder({ propertyId, amount, currency }, user)
 }
 
 export async function verifyFeaturePayment({ orderId, paymentId }) {
-  await connectDb();
+  await connectDB();
   const payment = await Payment.findOne({ orderId });
   if (!payment) throw new AppError(404, "Order not found");
 
@@ -70,4 +70,3 @@ export async function verifyFeaturePayment({ orderId, paymentId }) {
     featuredTill: property.featuredTill,
   };
 }
-

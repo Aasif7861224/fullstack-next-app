@@ -1,11 +1,11 @@
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Inquiry from "@/models/Inquiry";
 import Property from "@/models/Property";
 import { AppError } from "@/utils/errors";
 import { sendInquiryNotifications } from "@/services/emailService";
 
 export async function createInquiry(payload, senderUser = null) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findOne({ _id: payload.propertyId, isDeleted: false })
     .populate("ownerId", "email name")
     .lean();
@@ -37,12 +37,12 @@ export async function createInquiry(payload, senderUser = null) {
 }
 
 export async function listMyInquiries(user) {
-  await connectDb();
+  await connectDB();
   return Inquiry.find({ senderUserId: user._id }).sort({ createdAt: -1 }).populate("propertyId").lean();
 }
 
 export async function listOwnerInquiries(user) {
-  await connectDb();
+  await connectDB();
   return Inquiry.find({ ownerId: user._id })
     .sort({ createdAt: -1 })
     .populate("propertyId", "title slug status city")
@@ -50,7 +50,7 @@ export async function listOwnerInquiries(user) {
 }
 
 export async function updateOwnerInquiryStatus(user, inquiryId, status) {
-  await connectDb();
+  await connectDB();
   const inquiry = await Inquiry.findOneAndUpdate(
     { _id: inquiryId, ownerId: user._id },
     { status },

@@ -1,11 +1,11 @@
 import bcrypt from "bcryptjs";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import User from "@/models/User";
 import { AppError } from "@/utils/errors";
 import { ROLE } from "@/lib/constants";
 
 export async function registerUser(payload) {
-  await connectDb();
+  await connectDB();
   const existing = await User.findOne({ email: payload.email.toLowerCase() }).lean();
   if (existing) {
     throw new AppError(409, "User already exists");
@@ -32,7 +32,7 @@ export async function registerUser(payload) {
 }
 
 export async function loginUser(payload) {
-  await connectDb();
+  await connectDB();
   const user = await User.findOne({ email: payload.email.toLowerCase() }).select("+passwordHash");
   if (!user) {
     throw new AppError(401, "Invalid credentials");

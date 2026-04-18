@@ -1,5 +1,5 @@
 import { revalidateTag } from "next/cache";
-import { connectDb } from "@/lib/db";
+import connectDB from "@/lib/db";
 import Property from "@/models/Property";
 import User from "@/models/User";
 import { AppError } from "@/utils/errors";
@@ -50,7 +50,7 @@ function normalizePrimaryImage(images) {
 }
 
 export async function expireFeaturedListings() {
-  await connectDb();
+  await connectDB();
   await Property.updateMany(
     { isFeatured: true, featuredTill: { $lt: new Date() } },
     { $set: { isFeatured: false }, $unset: { featuredTill: 1 } }
@@ -58,7 +58,7 @@ export async function expireFeaturedListings() {
 }
 
 export async function listPublicProperties({ page, limit, skip, query }) {
-  await connectDb();
+  await connectDB();
   await expireFeaturedListings();
 
   const filter = {
@@ -106,7 +106,7 @@ export async function listPublicProperties({ page, limit, skip, query }) {
 }
 
 export async function getPropertyBySlug(slug) {
-  await connectDb();
+  await connectDB();
   await expireFeaturedListings();
   const property = await Property.findOne({
     slug,
@@ -121,7 +121,7 @@ export async function getPropertyBySlug(slug) {
 }
 
 export async function listRelatedProperties(property, limit = 4) {
-  await connectDb();
+  await connectDB();
   const filter = {
     _id: { $ne: property._id },
     isDeleted: false,
@@ -143,7 +143,7 @@ export async function listRelatedProperties(property, limit = 4) {
 }
 
 export async function incrementPropertyView(slug) {
-  await connectDb();
+  await connectDB();
   const updated = await Property.findOneAndUpdate(
     { slug, isDeleted: false, status: PROPERTY_STATUS.ACTIVE },
     { $inc: { views: 1 } },
@@ -154,7 +154,7 @@ export async function incrementPropertyView(slug) {
 }
 
 export async function createPropertyFromForm(formData, user) {
-  await connectDb();
+  await connectDB();
   if (![ROLE.OWNER, ROLE.ADMIN].includes(user.role)) {
     throw new AppError(403, "Only owners/admin can create properties");
   }
@@ -210,7 +210,7 @@ export async function createPropertyFromForm(formData, user) {
 }
 
 export async function updatePropertyFromForm(id, formData, user) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findById(id);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -266,7 +266,7 @@ export async function updatePropertyFromForm(id, formData, user) {
 }
 
 export async function softDeleteProperty(id, user) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findById(id);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -283,7 +283,7 @@ export async function softDeleteProperty(id, user) {
 }
 
 export async function listMyProperties(user, { page, limit, skip, status, q }) {
-  await connectDb();
+  await connectDB();
   const filter = { ownerId: user._id, isDeleted: false };
   if (status && status !== "all") filter.status = status;
   if (q) {
@@ -307,7 +307,7 @@ export async function listMyProperties(user, { page, limit, skip, status, q }) {
 }
 
 export async function getManagePropertyById(id, user) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findById(id).lean();
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -316,7 +316,7 @@ export async function getManagePropertyById(id, user) {
 }
 
 export async function saveProperty(user, propertyId) {
-  await connectDb();
+  await connectDB();
   const property = await Property.findOne({
     _id: propertyId,
     isDeleted: false,
@@ -330,14 +330,14 @@ export async function saveProperty(user, propertyId) {
 }
 
 export async function unsaveProperty(user, propertyId) {
-  await connectDb();
+  await connectDB();
   await User.updateOne({ _id: user._id }, { $pull: { savedProperties: propertyId } });
   revalidateTag(CACHE_TAGS.USER_DASHBOARD);
   return { saved: false };
 }
 
 export async function listSavedProperties(user, { page, limit, skip }) {
-  await connectDb();
+  await connectDB();
   const account = await User.findById(user._id).select("savedProperties").lean();
   const savedIds = (account?.savedProperties || []).map((item) => item.toString());
   if (!savedIds.length) {
@@ -370,7 +370,7 @@ export async function listSavedProperties(user, { page, limit, skip }) {
 }
 
 export async function getSavedPropertyIdSet(userId) {
-  await connectDb();
+  await connectDB();
   const user = await User.findById(userId).select("savedProperties").lean();
   return new Set((user?.savedProperties || []).map((item) => item.toString()));
 }
