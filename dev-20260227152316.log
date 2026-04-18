@@ -1,0 +1,16 @@
+
+> fullstack-next-app@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.132:3000
+- Environments: .env
+
+✓ Starting...
+Creating turbopack project {
+  dir: 'D:\\Online_Property_Listing\\fullstack-next-app',
+  testMode: true
+}
+✓ Ready in 1026ms
+^C^C
