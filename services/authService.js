@@ -6,20 +6,21 @@ import { ROLE } from "@/lib/constants";
 
 export async function registerUser(payload) {
   await connectDB();
-  const existing = await User.findOne({ email: payload.email.toLowerCase() }).lean();
+  const email = payload.email.trim().toLowerCase();
+  const existing = await User.findOne({ email }).lean();
   if (existing) {
     throw new AppError(409, "User already exists");
   }
   const requiresApproval = payload.role === ROLE.OWNER;
   const passwordHash = await bcrypt.hash(payload.password, 10);
   const user = await User.create({
-    name: payload.name,
-    email: payload.email.toLowerCase(),
+    name: payload.name.trim(),
+    email,
     passwordHash,
     role: payload.role || ROLE.USER,
     disabled: requiresApproval,
-    contact: payload.contact || "",
-    address: payload.address || "",
+    contact: payload.contact?.trim() || "",
+    address: payload.address?.trim() || "",
   });
 
   return {
@@ -33,7 +34,8 @@ export async function registerUser(payload) {
 
 export async function loginUser(payload) {
   await connectDB();
-  const user = await User.findOne({ email: payload.email.toLowerCase() }).select("+passwordHash");
+  const email = payload.email.trim().toLowerCase();
+  const user = await User.findOne({ email }).select("+passwordHash");
   if (!user) {
     throw new AppError(401, "Invalid credentials");
   }

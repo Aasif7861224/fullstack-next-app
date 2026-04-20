@@ -8,9 +8,10 @@ import {
 } from "@/services/inquiryService";
 import { inquirySchema } from "@/validators/inquiryValidator";
 import { sellerInquiryStatusSchema } from "@/validators/sellerValidator";
+import { readJsonBody } from "@/utils/request";
 
 export async function createInquiryController(request, responseBuilder) {
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = inquirySchema.parse(body);
   const sender = await getOptionalAuthUserFromRequest(request);
   const inquiry = await createInquiry(payload, sender);
@@ -33,7 +34,7 @@ export async function listOwnerInquiriesController(request, responseBuilder) {
 export async function updateOwnerInquiryStatusController(id, request, responseBuilder) {
   const user = await getAuthUserFromRequest(request);
   requireRole(user, [ROLE.OWNER]);
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = sellerInquiryStatusSchema.parse(body);
   const item = await updateOwnerInquiryStatus(user, id, payload.status);
   return responseBuilder(item);

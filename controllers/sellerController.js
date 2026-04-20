@@ -7,6 +7,7 @@ import {
   listSellerFeedback,
 } from "@/services/sellerService";
 import { sellerFeedbackCreateSchema } from "@/validators/sellerValidator";
+import { readJsonBody } from "@/utils/request";
 
 async function requireSeller(request) {
   const user = await getAuthUserFromRequest(request);
@@ -22,7 +23,7 @@ export async function sellerAnalyticsController(request, responseBuilder) {
 
 export async function createSellerFeedbackController(request, responseBuilder) {
   const user = await requireSeller(request);
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = sellerFeedbackCreateSchema.parse(body);
   const feedback = await createSellerFeedback(user, payload);
   return responseBuilder(feedback, 201);

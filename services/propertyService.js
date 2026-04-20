@@ -7,19 +7,13 @@ import { generateUniqueSlug } from "@/lib/slug";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { CACHE_TAGS, PROPERTY_STATUS, ROLE } from "@/lib/constants";
 import { persistImageFiles } from "@/utils/fileUpload";
+import { parseArrayField, parseOptionalNumber, parseStringField } from "@/utils/request";
+
+const PROPERTY_TYPES = new Set(["Flat", "Plot", "Villa", "House", "Other"]);
+const RENT_OR_SELL_TYPES = new Set(["Rent", "Sell"]);
 
 function parseAmenities(value) {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map((item) => `${item}`.trim()).filter(Boolean);
-  } catch {
-    return `${value}`
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [];
+  return parseArrayField(value);
 }
 
 function parseExistingImages(value) {
@@ -49,6 +43,57 @@ function normalizePrimaryImage(images) {
   }));
 }
 
+function parseEnumValue(value, fieldName, allowedValues, fallback = "") {
+  const normalized = parseStringField(value, fieldName, { fallback });
+  if (!normalized) {
+    return normalized;
+  }
+  if (!allowedValues.has(normalized)) {
+    throw new AppError(400, `${fieldName} must be one of: ${Array.from(allowedValues).join(", ")}`);
+  }
+  return normalized;
+}
+
+function parsePropertyPayload(formData) {
+  const title = parseStringField(formData.get("title"), "title", { required: true });
+  const location = parseStringField(formData.get("location"), "location", { required: true });
+  const city = parseStringField(formData.get("city"), "city");
+  const price = parseOptionalNumber(formData.get("price"), "price", { min: 1 });
+  const rentOrSell = parseEnumValue(formData.get("rentOrSell"), "rentOrSell", RENT_OR_SELL_TYPES);
+  const propertyType = parseEnumValue(
+    formData.get("propertyType"),
+    "propertyType",
+    PROPERTY_TYPES,
+    "Flat"
+  );
+  const description = parseStringField(formData.get("description"), "description");
+  const bhk = parseOptionalNumber(formData.get("bhk"), "bhk", { min: 1, integer: true });
+  const latitude = parseOptionalNumber(formData.get("latitude"), "latitude", { min: -90, max: 90 });
+  const longitude = parseOptionalNumber(formData.get("longitude"), "longitude", { min: -180, max: 180 });
+  const amenities = parseAmenities(formData.get("amenities"));
+
+  if (typeof price === "undefined") {
+    throw new AppError(400, "price is required");
+  }
+  if (!rentOrSell) {
+    throw new AppError(400, "rentOrSell is required");
+  }
+
+  return {
+    title,
+    location,
+    city,
+    price,
+    rentOrSell,
+    propertyType,
+    description,
+    bhk,
+    latitude,
+    longitude,
+    amenities,
+  };
+}
+
 export async function expireFeaturedListings() {
   await connectDB();
   await Property.updateMany(
@@ -76,11 +121,23 @@ export async function listPublicProperties({ page, limit, skip, query }) {
   if (query.city) filter.city = { $regex: query.city, $options: "i" };
   if (query.propertyType) filter.propertyType = query.propertyType;
   if (query.rentOrSell) filter.rentOrSell = query.rentOrSell;
-  if (query.bhk) filter.bhk = Number(query.bhk);
-  if (query.minPrice || query.maxPrice) {
+  const bhk = parseOptionalNumber(query.bhk, "bhk", { min: 1, integer: true });
+  const minPrice = parseOptionalNumber(query.minPrice, "minPrice", { min: 0 });
+  const maxPrice = parseOptionalNumber(query.maxPrice, "maxPrice", { min: 0 });
+  if (typeof bhk !== "undefined") {
+    filter.bhk = bhk;
+  }
+  if (typeof minPrice !== "undefined" || typeof maxPrice !== "undefined") {
     filter.price = {};
-    if (query.minPrice) filter.price.$gte = Number(query.minPrice);
-    if (query.maxPrice) filter.price.$lte = Number(query.maxPrice);
+    if (typeof minPrice !== "undefined") filter.price.$gte = minPrice;
+    if (typeof maxPrice !== "undefined") filter.price.$lte = maxPrice;
+  }
+  if (
+    typeof minPrice !== "undefined" &&
+    typeof maxPrice !== "undefined" &&
+    minPrice > maxPrice
+  ) {
+    throw new AppError(400, "minPrice cannot be greater than maxPrice");
   }
 
   let sort = { createdAt: -1 };
@@ -155,31 +212,15 @@ export async function incrementPropertyView(slug) {
 
 export async function createPropertyFromForm(formData, user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   if (![ROLE.OWNER, ROLE.ADMIN].includes(user.role)) {
     throw new AppError(403, "Only owners/admin can create properties");
   }
 
-  const title = `${formData.get("title") || ""}`.trim();
-  const location = `${formData.get("location") || ""}`.trim();
-  const city = `${formData.get("city") || ""}`.trim();
-  const price = Number(formData.get("price"));
-  const rentOrSell = `${formData.get("rentOrSell") || ""}`.trim();
-  const propertyType = `${formData.get("propertyType") || "Flat"}`.trim();
-  const description = `${formData.get("description") || ""}`.trim();
-  const bhkRaw = formData.get("bhk");
-  const bhk = bhkRaw ? Number(bhkRaw) : undefined;
-  const latRaw = formData.get("latitude");
-  const lngRaw = formData.get("longitude");
-  const latitude = latRaw ? Number(latRaw) : undefined;
-  const longitude = lngRaw ? Number(lngRaw) : undefined;
-  const amenities = parseAmenities(formData.get("amenities"));
-
-  if (!title || !location || !price || !rentOrSell) {
-    throw new AppError(400, "title, location, price, rentOrSell are required");
-  }
-  if (!Number.isFinite(price) || price <= 0) {
-    throw new AppError(400, "price must be positive");
-  }
+  const { title, location, city, price, rentOrSell, propertyType, description, bhk, latitude, longitude, amenities } =
+    parsePropertyPayload(formData);
 
   const files = formData.getAll("images").filter((file) => file?.size > 0);
   const uploadedImages = await persistImageFiles(files);
@@ -211,49 +252,35 @@ export async function createPropertyFromForm(formData, user) {
 
 export async function updatePropertyFromForm(id, formData, user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const property = await Property.findById(id);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
   if (!isOwner && user.role !== ROLE.ADMIN) throw new AppError(403, "Not authorized");
 
-  const title = formData.get("title");
-  const location = formData.get("location");
-  const city = formData.get("city");
-  const price = formData.get("price");
-  const rentOrSell = formData.get("rentOrSell");
-  const propertyType = formData.get("propertyType");
-  const description = formData.get("description");
-  const bhk = formData.get("bhk");
-  const latitude = formData.get("latitude");
-  const longitude = formData.get("longitude");
-  const amenitiesRaw = formData.get("amenities");
+  const oldSlug = property.slug;
+  const next = parsePropertyPayload(formData);
 
-  if (title !== null) property.title = `${title}`.trim();
-  if (location !== null) property.location = `${location}`.trim();
-  if (city !== null) property.city = `${city}`.trim();
-  if (price !== null) property.price = Number(price);
-  if (rentOrSell !== null) property.rentOrSell = `${rentOrSell}`.trim();
-  if (propertyType !== null) property.propertyType = `${propertyType}`.trim();
-  if (description !== null) property.description = `${description}`.trim();
-  if (bhk !== null) property.bhk = Number(bhk);
-  if (latitude !== null) property.latitude = Number(latitude);
-  if (longitude !== null) property.longitude = Number(longitude);
-  if (amenitiesRaw !== null) property.amenities = parseAmenities(amenitiesRaw);
-
-  if (title !== null || city !== null || location !== null) {
-    property.slug = await generateUniqueSlug(
-      Property,
-      property.title,
-      property.city || property.location,
-      property._id
-    );
-  }
+  property.title = next.title;
+  property.location = next.location;
+  property.city = next.city;
+  property.price = next.price;
+  property.rentOrSell = next.rentOrSell;
+  property.propertyType = next.propertyType;
+  property.description = next.description;
+  property.bhk = next.bhk;
+  property.latitude = next.latitude;
+  property.longitude = next.longitude;
+  property.amenities = next.amenities;
+  property.slug = await generateUniqueSlug(Property, property.title, property.city || property.location, property._id);
 
   const existingImages = parseExistingImages(formData.get("existingImages"));
   const files = formData.getAll("images").filter((file) => file?.size > 0);
   const uploadedImages = await persistImageFiles(files);
   const mergedImages = normalizePrimaryImage([...existingImages, ...uploadedImages]);
-  if (mergedImages.length) property.images = mergedImages;
+  property.images = mergedImages;
 
   if (user.role !== ROLE.ADMIN) {
     property.status = PROPERTY_STATUS.PENDING;
@@ -261,12 +288,16 @@ export async function updatePropertyFromForm(id, formData, user) {
 
   await property.save();
   revalidateTag(CACHE_TAGS.PROPERTIES);
+  revalidateTag(`${CACHE_TAGS.PROPERTY}-${oldSlug}`);
   revalidateTag(`${CACHE_TAGS.PROPERTY}-${property.slug}`);
   return property;
 }
 
 export async function softDeleteProperty(id, user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const property = await Property.findById(id);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -284,6 +315,9 @@ export async function softDeleteProperty(id, user) {
 
 export async function listMyProperties(user, { page, limit, skip, status, q }) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const filter = { ownerId: user._id, isDeleted: false };
   if (status && status !== "all") filter.status = status;
   if (q) {
@@ -308,6 +342,9 @@ export async function listMyProperties(user, { page, limit, skip, status, q }) {
 
 export async function getManagePropertyById(id, user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const property = await Property.findById(id).lean();
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -317,6 +354,9 @@ export async function getManagePropertyById(id, user) {
 
 export async function saveProperty(user, propertyId) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const property = await Property.findOne({
     _id: propertyId,
     isDeleted: false,
@@ -331,6 +371,9 @@ export async function saveProperty(user, propertyId) {
 
 export async function unsaveProperty(user, propertyId) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   await User.updateOne({ _id: user._id }, { $pull: { savedProperties: propertyId } });
   revalidateTag(CACHE_TAGS.USER_DASHBOARD);
   return { saved: false };
@@ -338,6 +381,9 @@ export async function unsaveProperty(user, propertyId) {
 
 export async function listSavedProperties(user, { page, limit, skip }) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const account = await User.findById(user._id).select("savedProperties").lean();
   const savedIds = (account?.savedProperties || []).map((item) => item.toString());
   if (!savedIds.length) {
@@ -371,6 +417,9 @@ export async function listSavedProperties(user, { page, limit, skip }) {
 
 export async function getSavedPropertyIdSet(userId) {
   await connectDB();
+  if (!userId) {
+    return new Set();
+  }
   const user = await User.findById(userId).select("savedProperties").lean();
   return new Set((user?.savedProperties || []).map((item) => item.toString()));
 }

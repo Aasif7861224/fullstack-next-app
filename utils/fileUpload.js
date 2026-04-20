@@ -17,7 +17,13 @@ export async function persistImageFiles(files) {
   if (!files?.length) return [];
 
   const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await fs.mkdir(uploadDir, { recursive: true });
+  try {
+    await fs.mkdir(uploadDir, { recursive: true });
+  } catch (error) {
+    throw new AppError(503, "Image upload storage is unavailable in this environment", {
+      code: error?.code || null,
+    });
+  }
 
   const images = [];
   for (let index = 0; index < files.length; index += 1) {
@@ -34,7 +40,13 @@ export async function persistImageFiles(files) {
     const ext = extensionFromMime(file.type);
     const randomName = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${ext}`;
     const absolutePath = path.join(uploadDir, randomName);
-    await fs.writeFile(absolutePath, buffer);
+    try {
+      await fs.writeFile(absolutePath, buffer);
+    } catch (error) {
+      throw new AppError(503, "Image upload storage is unavailable in this environment", {
+        code: error?.code || null,
+      });
+    }
 
     images.push({
       url: `/uploads/${randomName}`,
@@ -48,4 +60,3 @@ export async function persistImageFiles(files) {
   }
   return images;
 }
-

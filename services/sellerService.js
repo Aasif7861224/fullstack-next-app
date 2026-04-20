@@ -21,6 +21,9 @@ async function expireFeaturedListingsForSeller(ownerId) {
 
 export async function getSellerAnalytics(user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   await expireFeaturedListingsForSeller(user._id);
 
   const ownerFilter = { ownerId: user._id };
@@ -133,6 +136,9 @@ export async function getSellerAnalytics(user) {
 
 export async function createSellerFeedback(user, payload) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const feedback = await SellerFeedback.create({
     sellerId: user._id,
     subject: payload.subject,
@@ -146,6 +152,9 @@ export async function createSellerFeedback(user, payload) {
 
 export async function listSellerFeedback(user, { page, limit, skip, status }) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const filter = { sellerId: user._id };
   if (status && status !== "all") {
     filter.status = status;

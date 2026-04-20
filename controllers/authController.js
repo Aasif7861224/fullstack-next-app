@@ -4,6 +4,7 @@ import { loginSchema, registerSchema } from "@/validators/authValidator";
 import { loginUser, registerUser } from "@/services/authService";
 import { getAuthUserFromRequest } from "@/lib/auth";
 import { AppError } from "@/utils/errors";
+import { readJsonBody } from "@/utils/request";
 
 const cookieOptions = {
   httpOnly: true,
@@ -13,7 +14,7 @@ const cookieOptions = {
 };
 
 export async function registerController(request, responseBuilder) {
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = registerSchema.parse(body);
   const user = await registerUser(payload);
 
@@ -44,7 +45,7 @@ export async function registerController(request, responseBuilder) {
 }
 
 export async function loginController(request, responseBuilder) {
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = loginSchema.parse(body);
   const user = await loginUser(payload);
   const token = signJwt({ id: user.id, role: user.role });

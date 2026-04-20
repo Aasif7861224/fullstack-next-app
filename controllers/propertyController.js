@@ -15,6 +15,7 @@ import {
   updatePropertyFromForm,
 } from "@/services/propertyService";
 import { serializePagination, serializePublicProperty } from "@/utils/serializers";
+import { readFormBody } from "@/utils/request";
 
 function buildQuery(searchParams) {
   return {
@@ -72,14 +73,14 @@ export async function incrementPropertyViewController(slug, responseBuilder) {
 
 export async function createPropertyController(request, responseBuilder) {
   const user = await getAuthUserFromRequest(request);
-  const formData = await request.formData();
+  const formData = await readFormBody(request);
   const property = await createPropertyFromForm(formData, user);
   return responseBuilder(serializePublicProperty(property), 201);
 }
 
 export async function updatePropertyController(id, request, responseBuilder) {
   const user = await getAuthUserFromRequest(request);
-  const formData = await request.formData();
+  const formData = await readFormBody(request);
   const property = await updatePropertyFromForm(id, formData, user);
   return responseBuilder(serializePublicProperty(property));
 }

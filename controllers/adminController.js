@@ -15,7 +15,9 @@ import {
   updateUserStatus,
 } from "@/services/adminService";
 import { listAdminSellerFeedback, updateSellerFeedbackByAdmin } from "@/services/sellerService";
+import { userStatusSchema } from "@/validators/adminValidator";
 import { sellerFeedbackAdminUpdateSchema } from "@/validators/sellerValidator";
+import { readJsonBody } from "@/utils/request";
 
 async function requireAdmin(request) {
   const user = await getAuthUserFromRequest(request);
@@ -54,8 +56,9 @@ export async function listUsersController(request, responseBuilder) {
 
 export async function updateUserStatusController(id, request, responseBuilder) {
   await requireAdmin(request);
-  const body = await request.json();
-  const data = await updateUserStatus(id, body.action);
+  const body = await readJsonBody(request);
+  const payload = userStatusSchema.parse(body);
+  const data = await updateUserStatus(id, payload.action);
   return responseBuilder(data);
 }
 
@@ -109,7 +112,7 @@ export async function listAdminSellerFeedbackController(request, responseBuilder
 
 export async function updateAdminSellerFeedbackController(id, request, responseBuilder) {
   await requireAdmin(request);
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = sellerFeedbackAdminUpdateSchema.parse(body);
   const data = await updateSellerFeedbackByAdmin(id, payload);
   return responseBuilder(data);

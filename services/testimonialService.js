@@ -6,8 +6,8 @@ export async function createTestimonial(payload, user = null) {
   await connectDB();
   const testimonial = await Testimonial.create({
     userId: user?._id || null,
-    name: payload.name || user?.name || "Anonymous",
-    message: payload.message,
+    name: payload.name?.trim() || user?.name || "Anonymous",
+    message: payload.message.trim(),
     rating: payload.rating,
     approved: false,
   });

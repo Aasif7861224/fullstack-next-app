@@ -10,6 +10,9 @@ import { getFeaturedTill } from "@/utils/feature";
 
 export async function createFeatureOrder({ propertyId, amount, currency }, user) {
   await connectDB();
+  if (!user?._id) {
+    throw new AppError(401, "Authentication required");
+  }
   const property = await Property.findById(propertyId);
   if (!property || property.isDeleted) throw new AppError(404, "Property not found");
   const isOwner = property.ownerId.toString() === user._id.toString();
@@ -27,7 +30,7 @@ export async function createFeatureOrder({ propertyId, amount, currency }, user)
     propertyId,
     purpose: "feature_listing",
     amount: finalAmount,
-    currency: currency || "INR",
+    currency: currency?.toUpperCase() || "INR",
     orderId,
     status: "initiated",
   });
@@ -44,10 +47,13 @@ export async function verifyFeaturePayment({ orderId, paymentId }) {
   const payment = await Payment.findOne({ orderId });
   if (!payment) throw new AppError(404, "Order not found");
 
-  if (!paymentId) {
-    payment.status = "failed";
-    await payment.save();
-    throw new AppError(400, "Payment verification failed");
+  if (payment.status === "paid" && payment.paymentId) {
+    const property = await Property.findById(payment.propertyId);
+    return {
+      paymentId: payment.paymentId,
+      orderId: payment.orderId,
+      featuredTill: property?.featuredTill || null,
+    };
   }
 
   payment.paymentId = paymentId;

@@ -10,9 +10,10 @@ import {
   listAdminContactLeads,
   updateContactLeadByAdmin,
 } from "@/services/contactLeadService";
+import { readJsonBody } from "@/utils/request";
 
 export async function createContactLeadController(request, responseBuilder) {
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = contactLeadCreateSchema.parse(body);
   const lead = await createContactLead(payload);
   return responseBuilder(lead, 201);
@@ -36,7 +37,7 @@ export async function listAdminContactLeadsController(request, responseBuilder) 
 
 export async function updateAdminContactLeadController(id, request, responseBuilder) {
   await requireAdmin(request);
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const payload = contactLeadAdminUpdateSchema.parse(body);
   const data = await updateContactLeadByAdmin(id, payload);
   return responseBuilder(data);
