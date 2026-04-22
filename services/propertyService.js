@@ -6,7 +6,6 @@ import { AppError } from "@/utils/errors";
 import { generateUniqueSlug } from "@/lib/slug";
 import { buildPaginationMeta } from "@/lib/pagination";
 import { CACHE_TAGS, PROPERTY_STATUS, ROLE } from "@/lib/constants";
-import { persistImageFiles } from "@/utils/fileUpload";
 import { parseArrayField, parseOptionalNumber, parseStringField } from "@/utils/request";
 
 const PROPERTY_TYPES = new Set(["Flat", "Plot", "Villa", "House", "Other"]);
@@ -18,19 +17,75 @@ function parseAmenities(value) {
 
 function parseExistingImages(value) {
   if (!value) return [];
+
+  let parsed = null;
   try {
-    const parsed = JSON.parse(value);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((img) => img?.url)
-      .map((img, index) => ({
-        url: `${img.url}`,
-        isPrimary: Boolean(img.isPrimary),
-        altText: img.altText || `property image ${index + 1}`,
-      }));
+    parsed = JSON.parse(value);
   } catch {
-    return [];
+    throw new AppError(400, "existingImages must be a valid JSON array");
   }
+
+  return normalizeSubmittedImages(parsed, {
+    allowRelativeUrls: true,
+    fieldName: "existingImages",
+  });
+}
+
+function validateImageUrl(value, { allowRelativeUrls = false } = {}) {
+  const url = parseStringField(value, "image url", { required: true });
+
+  if (allowRelativeUrls && url.startsWith("/")) {
+    return url;
+  }
+
+  let parsedUrl = null;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new AppError(400, "Each image must have a valid URL");
+  }
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new AppError(400, "Each image URL must use http or https");
+  }
+
+  return parsedUrl.toString();
+}
+
+function normalizeSubmittedImages(value, { allowRelativeUrls = false, fieldName = "uploadedImages" } = {}) {
+  if (!Array.isArray(value)) {
+    throw new AppError(400, `${fieldName} must be an array`);
+  }
+
+  return value
+    .map((item, index) => {
+      const image = typeof item === "string" ? { url: item } : item;
+      if (!image?.url) {
+        return null;
+      }
+
+      return {
+        url: validateImageUrl(image.url, { allowRelativeUrls }),
+        isPrimary: Boolean(image.isPrimary),
+        altText: parseStringField(image.altText, "altText", {
+          fallback: `property image ${index + 1}`,
+        }),
+      };
+    })
+    .filter(Boolean);
+}
+
+function parseUploadedImages(value) {
+  if (!value) return [];
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new AppError(400, "uploadedImages must be a valid JSON array");
+  }
+
+  return normalizePrimaryImage(normalizeSubmittedImages(parsed, { fieldName: "uploadedImages" }));
 }
 
 function normalizePrimaryImage(images) {
@@ -221,10 +276,7 @@ export async function createPropertyFromForm(formData, user) {
 
   const { title, location, city, price, rentOrSell, propertyType, description, bhk, latitude, longitude, amenities } =
     parsePropertyPayload(formData);
-
-  const files = formData.getAll("images").filter((file) => file?.size > 0);
-  const uploadedImages = await persistImageFiles(files);
-  const images = normalizePrimaryImage(uploadedImages);
+  const images = parseUploadedImages(formData.get("uploadedImages"));
 
   const slug = await generateUniqueSlug(Property, title, city || location);
 
@@ -277,8 +329,7 @@ export async function updatePropertyFromForm(id, formData, user) {
   property.slug = await generateUniqueSlug(Property, property.title, property.city || property.location, property._id);
 
   const existingImages = parseExistingImages(formData.get("existingImages"));
-  const files = formData.getAll("images").filter((file) => file?.size > 0);
-  const uploadedImages = await persistImageFiles(files);
+  const uploadedImages = parseUploadedImages(formData.get("uploadedImages"));
   const mergedImages = normalizePrimaryImage([...existingImages, ...uploadedImages]);
   property.images = mergedImages;
 

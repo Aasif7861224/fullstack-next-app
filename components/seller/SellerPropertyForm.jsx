@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTopLoader } from "@/components/site/TopLoaderProvider";
+import { uploadImagesToCloudinary } from "@/utils/cloudinaryUpload";
 
 function normalizePrimary(images) {
   if (!images.length) return images;
@@ -31,11 +33,15 @@ function mapInitialForm(initialData = {}) {
 
 export default function SellerPropertyForm({ mode = "create", propertyId = "", initialData = null }) {
   const router = useRouter();
+  const topLoader = useTopLoader();
   const [form, setForm] = useState(mapInitialForm(initialData || {}));
   const [existingImages, setExistingImages] = useState(normalizePrimary(initialData?.images || []));
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [statusText, setStatusText] = useState("");
+  const uploadCacheRef = useRef(new Map());
 
   const isEdit = mode === "edit";
 
@@ -58,9 +64,30 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (loading) return;
+
     setLoading(true);
     setError("");
+    setUploadProgress(files.length ? 0 : 100);
+    setStatusText(files.length ? "Uploading images to Cloudinary..." : "Saving listing...");
+    topLoader.start(6);
+
     try {
+      let uploadedImages = [];
+
+      if (files.length) {
+        uploadedImages = await uploadImagesToCloudinary(files, {
+          cache: uploadCacheRef.current,
+          onProgress: (percent) => {
+            setUploadProgress(percent);
+            topLoader.setProgress(Math.max(12, Math.min(88, percent)));
+          },
+        });
+      }
+
+      setStatusText("Saving listing...");
+      topLoader.setProgress(94);
+
       const payload = new FormData();
       Object.entries(form).forEach(([key, value]) => {
         payload.append(key, `${value}`);
@@ -70,7 +97,7 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
         payload.append("existingImages", JSON.stringify(existingImages));
       }
 
-      Array.from(files).forEach((file) => payload.append("images", file));
+      payload.append("uploadedImages", JSON.stringify(uploadedImages));
 
       const endpoint = isEdit ? `/api/properties/manage/${propertyId}` : "/api/properties";
       const method = isEdit ? "PUT" : "POST";
@@ -80,12 +107,15 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
         throw new Error(json.message || "Failed to save property");
       }
 
+      topLoader.finish();
       router.push("/seller/properties");
       router.refresh();
     } catch (err) {
-      setError(err.message);
+      topLoader.fail();
+      setError(err.message || "Something went wrong while saving the property.");
     } finally {
       setLoading(false);
+      setStatusText("");
     }
   };
 
@@ -254,18 +284,33 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
           <input
             type="file"
             multiple
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="input"
-            onChange={(event) => setFiles(event.target.files || [])}
+            onChange={(event) => setFiles(Array.from(event.target.files || []))}
+            disabled={loading}
           />
-          {files.length ? <p className="small">{files.length} file(s) selected.</p> : null}
+          {files.length ? (
+            <p className="small">{files.length} file(s) selected. Images upload directly to Cloudinary on save.</p>
+          ) : null}
         </label>
+
+        {loading ? (
+          <div className="seller-form-full seller-upload-status" aria-live="polite">
+            <div className="seller-upload-meta">
+              <span>{statusText || "Working..."}</span>
+              {files.length ? <strong>{uploadProgress}%</strong> : null}
+            </div>
+            <div className="seller-upload-progress" aria-hidden="true">
+              <span style={{ width: `${files.length ? uploadProgress : 100}%` }} />
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className="small" style={{ color: "#fca5a5" }}>{error}</p> : null}
 
         <div className="seller-form-full seller-actions-inline">
           <button className="seller-btn" type="submit" disabled={loading}>
-            {loading ? "Saving..." : isEdit ? "Update Listing" : "Create Listing"}
+            {loading ? (files.length ? "Uploading..." : "Saving...") : isEdit ? "Update Listing" : "Create Listing"}
           </button>
           <button
             className="seller-btn ghost"

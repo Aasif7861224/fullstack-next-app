@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Merriweather, Plus_Jakarta_Sans } from "next/font/google";
+import AppProviders from "@/components/site/AppProviders";
 
 const displayFont = Merriweather({
   subsets: ["latin"],
@@ -24,7 +25,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${displayFont.variable} ${bodyFont.variable}`}>{children}</body>
+      <body className={`${displayFont.variable} ${bodyFont.variable}`}>
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

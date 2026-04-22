@@ -984,6 +984,41 @@ a {
   border-radius: 8px;
 }
 
+.seller-upload-status {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid rgba(29, 111, 93, 0.18);
+  background:
+    linear-gradient(135deg, rgba(245, 255, 250, 0.92), rgba(231, 246, 240, 0.94));
+}
+
+.seller-upload-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  color: #1f4b41;
+  font-size: 0.86rem;
+}
+
+.seller-upload-progress {
+  position: relative;
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(31, 85, 71, 0.12);
+}
+
+.seller-upload-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0e8b72, #18b487, #4fc3a1);
+  transition: width 180ms ease;
+}
+
 .seller-distribution-wrap {
   display: grid;
   gap: 0.6rem;
@@ -1091,6 +1126,36 @@ a {
 }
 
 /* Public Frontend 2026 */
+
+.top-loader-shell {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 9999;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.top-loader-shell.visible {
+  opacity: 1;
+}
+
+.top-loader-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #ff5f6d, #ffc371, #00c6ff);
+  box-shadow: 0 0 14px rgba(0, 198, 255, 0.55);
+  transition:
+    width 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.top-loader-bar.error {
+  background: linear-gradient(90deg, #ff5a5f, #ff7b54);
+  box-shadow: 0 0 14px rgba(255, 90, 95, 0.5);
+}
 
 .public-main {
   flex: 1;
