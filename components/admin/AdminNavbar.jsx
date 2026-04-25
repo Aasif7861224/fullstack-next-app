@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ROLE_LABEL } from "@/lib/constants";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 const links = [
   { href: "/admin", label: "Overview" },
@@ -19,7 +20,7 @@ const links = [
 export default function AdminNavbar({ user }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useLoaderRouter();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 export default function SavePropertyButton({
   propertyId,
@@ -10,7 +10,7 @@ export default function SavePropertyButton({
   onSavedChange = null,
   className = "",
 }) {
-  const router = useRouter();
+  const router = useLoaderRouter();
   const [saved, setSaved] = useState(Boolean(initialSaved));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");

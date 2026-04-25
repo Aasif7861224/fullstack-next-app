@@ -1,9 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useTopLoader } from "@/components/site/TopLoaderProvider";
-import { uploadImagesToCloudinary } from "@/utils/cloudinaryUpload";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
+import { getOptimizedCloudinaryUrl } from "@/utils/cloudinaryImage";
+import {
+  MAX_IMAGE_COUNT,
+  formatFileSize,
+  uploadImagesToCloudinary,
+  validateSelectedImages,
+} from "@/utils/cloudinaryUpload";
 
 function normalizePrimary(images) {
   if (!images.length) return images;
@@ -32,18 +39,21 @@ function mapInitialForm(initialData = {}) {
 }
 
 export default function SellerPropertyForm({ mode = "create", propertyId = "", initialData = null }) {
-  const router = useRouter();
+  const router = useLoaderRouter();
   const topLoader = useTopLoader();
   const [form, setForm] = useState(mapInitialForm(initialData || {}));
   const [existingImages, setExistingImages] = useState(normalizePrimary(initialData?.images || []));
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectionMessage, setSelectionMessage] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
   const uploadCacheRef = useRef(new Map());
 
   const isEdit = mode === "edit";
+  const remainingImageSlots = Math.max(MAX_IMAGE_COUNT - existingImages.length, 0);
+  const remainingAfterSelection = Math.max(MAX_IMAGE_COUNT - existingImages.length - files.length, 0);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -62,6 +72,36 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
     setExistingImages((prev) => normalizePrimary(prev.filter((_, imgIndex) => imgIndex !== index)));
   };
 
+  const handleFileChange = (event) => {
+    const nextSelection = Array.from(event.target.files || []);
+
+    if (!nextSelection.length) {
+      setFiles([]);
+      setSelectionMessage("");
+      setError("");
+      return;
+    }
+
+    try {
+      const nextFiles = validateSelectedImages(nextSelection, {
+        existingCount: existingImages.length,
+      });
+
+      setFiles(nextFiles);
+      setError("");
+      setSelectionMessage(
+        nextFiles.length < nextSelection.length
+          ? "Duplicate images were skipped. Ready to upload the remaining files."
+          : `${nextFiles.length} image(s) ready. Images upload to Cloudinary when you save the listing.`
+      );
+      event.target.value = "";
+    } catch (err) {
+      setError(err.message || "Please review your selected images and try again.");
+      setSelectionMessage("");
+      event.target.value = "";
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (loading) return;
@@ -73,10 +113,13 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
     topLoader.start(6);
 
     try {
+      const preparedFiles = validateSelectedImages(files, {
+        existingCount: existingImages.length,
+      });
       let uploadedImages = [];
 
-      if (files.length) {
-        uploadedImages = await uploadImagesToCloudinary(files, {
+      if (preparedFiles.length) {
+        uploadedImages = await uploadImagesToCloudinary(preparedFiles, {
           cache: uploadCacheRef.current,
           onProgress: (percent) => {
             setUploadProgress(percent);
@@ -254,7 +297,14 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
             <div className="seller-image-grid">
               {existingImages.map((img, index) => (
                 <article key={`${img.url}-${index}`} className="seller-image-card">
-                  <img src={img.url} alt={img.altText || `image ${index + 1}`} />
+                  <div className="seller-image-thumb">
+                    <Image
+                      src={getOptimizedCloudinaryUrl(img.url, "thumbnail")}
+                      alt={img.altText || `image ${index + 1}`}
+                      fill
+                      sizes="(max-width: 1020px) 50vw, 180px"
+                    />
+                  </div>
                   <div>
                     <label className="small">
                       <input
@@ -286,12 +336,27 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
             multiple
             accept="image/jpeg,image/png,image/webp"
             className="input"
-            onChange={(event) => setFiles(Array.from(event.target.files || []))}
-            disabled={loading}
+            onChange={handleFileChange}
+            disabled={loading || remainingImageSlots === 0}
           />
+          <p className="small">
+            Upload up to {MAX_IMAGE_COUNT} images total.{" "}
+            {files.length ? `${remainingAfterSelection} slot(s) left after this selection.` : `${remainingImageSlots} slot(s) available right now.`}
+          </p>
           {files.length ? (
-            <p className="small">{files.length} file(s) selected. Images upload directly to Cloudinary on save.</p>
+            <>
+              <p className="small">{files.length} file(s) selected. Images upload directly to Cloudinary on save.</p>
+              <div className="seller-upload-list">
+                {files.map((file) => (
+                  <div key={`${file.name}-${file.lastModified}`} className="seller-upload-pill">
+                    <strong>{file.name}</strong>
+                    <span>{formatFileSize(file.size)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : null}
+          {selectionMessage ? <p className="small" style={{ color: "#2b6e5c" }}>{selectionMessage}</p> : null}
         </label>
 
         {loading ? (
@@ -310,7 +375,14 @@ export default function SellerPropertyForm({ mode = "create", propertyId = "", i
 
         <div className="seller-form-full seller-actions-inline">
           <button className="seller-btn" type="submit" disabled={loading}>
-            {loading ? (files.length ? "Uploading..." : "Saving...") : isEdit ? "Update Listing" : "Create Listing"}
+            {loading ? (
+              <>
+                <span className="btn-spinner" aria-hidden="true" />
+                <span>{files.length ? "Uploading..." : "Saving..."}</span>
+              </>
+            ) : (
+              <span>{isEdit ? "Update Listing" : "Create Listing"}</span>
+            )}
           </button>
           <button
             className="seller-btn ghost"

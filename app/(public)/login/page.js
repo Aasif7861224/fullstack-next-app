@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 const defaultForm = {
   name: "",
@@ -14,7 +15,7 @@ const defaultForm = {
 };
 
 function LoginContent() {
-  const router = useRouter();
+  const router = useLoaderRouter();
   const params = useSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [form, setForm] = useState(defaultForm);

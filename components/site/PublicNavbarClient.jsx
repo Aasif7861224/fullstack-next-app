@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 const baseLinks = [
   { href: "/", label: "Home" },
@@ -15,7 +16,7 @@ const baseLinks = [
 
 export default function PublicNavbarClient({ user = null, dashboardHref = "/dashboard" }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useLoaderRouter();
   const [open, setOpen] = useState(false);
 
   const links = useMemo(() => baseLinks, []);

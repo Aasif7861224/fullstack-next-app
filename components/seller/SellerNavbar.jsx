@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 const links = [
   { href: "/seller", label: "Overview" },
@@ -20,7 +21,7 @@ function isActive(pathname, href) {
 
 export default function SellerNavbar({ user }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useLoaderRouter();
   const [open, setOpen] = useState(false);
 
   const handleLogout = async () => {

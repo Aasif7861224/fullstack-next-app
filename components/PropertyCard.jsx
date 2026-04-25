@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import SavePropertyButton from "@/components/public/SavePropertyButton";
+import { getOptimizedCloudinaryUrl } from "@/utils/cloudinaryImage";
 
 export default function PropertyCard({
   property,
@@ -11,12 +12,13 @@ export default function PropertyCard({
 }) {
   const propertyId = property?._id ? `${property._id}` : "";
   const primaryImage = property.images?.find((img) => img.isPrimary) || property.images?.[0];
+  const imageSrc = getOptimizedCloudinaryUrl(primaryImage?.url || "/window.svg", "card");
 
   return (
     <article className={`property-card ${compact ? "compact" : ""}`} data-reveal>
       <div className="property-card-media">
         <Image
-          src={primaryImage?.url || "/window.svg"}
+          src={imageSrc}
           alt={primaryImage?.altText || property.title}
           fill
           sizes={compact ? "(max-width: 768px) 100vw, 33vw" : "(max-width: 768px) 100vw, 25vw"}

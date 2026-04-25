@@ -1,8 +1,17 @@
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+export const MAX_IMAGE_COUNT = 5;
+export const MAX_FILE_SIZE = 5 * 1024 * 1024;
+export const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-function buildFileKey(file) {
+export function buildFileKey(file) {
   return [file.name, file.size, file.type, file.lastModified].join(":");
+}
+
+export function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 MB";
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 1024 * 1024 ? 1 : 2)} MB`;
 }
 
 function validateUploadConfig() {
@@ -30,6 +39,34 @@ function validateImageFile(file) {
   if (file.size > MAX_FILE_SIZE) {
     throw new Error(`${file.name} is too large. Maximum size is 5MB.`);
   }
+}
+
+export function validateSelectedImages(files, { existingCount = 0, maxCount = MAX_IMAGE_COUNT } = {}) {
+  const selectedFiles = Array.from(files || []).filter(Boolean);
+  const uniqueFiles = [];
+  const seenKeys = new Set();
+
+  selectedFiles.forEach((file) => {
+    validateImageFile(file);
+    const fileKey = buildFileKey(file);
+    if (seenKeys.has(fileKey)) {
+      return;
+    }
+
+    seenKeys.add(fileKey);
+    uniqueFiles.push(file);
+  });
+
+  const remainingSlots = Math.max(maxCount - existingCount, 0);
+  if (existingCount + uniqueFiles.length > maxCount) {
+    if (remainingSlots === 0) {
+      throw new Error(`You already have ${maxCount} images. Remove one before adding another.`);
+    }
+
+    throw new Error(`You can upload up to ${maxCount} images total. Select ${remainingSlots} or fewer new image(s).`);
+  }
+
+  return uniqueFiles;
 }
 
 function uploadSingleImage(file, config, onProgress) {
@@ -85,7 +122,7 @@ function uploadSingleImage(file, config, onProgress) {
 }
 
 export async function uploadImagesToCloudinary(files, { cache, onProgress } = {}) {
-  const selectedFiles = Array.from(files || []).filter(Boolean);
+  const selectedFiles = validateSelectedImages(files);
 
   if (!selectedFiles.length) {
     onProgress?.(100);
@@ -94,6 +131,15 @@ export async function uploadImagesToCloudinary(files, { cache, onProgress } = {}
 
   const config = validateUploadConfig();
   const fileProgress = selectedFiles.map(() => 0);
+  const fileKeyIndexes = new Map();
+  const pendingUploads = new Map();
+
+  selectedFiles.forEach((file, index) => {
+    const fileKey = buildFileKey(file);
+    const indexes = fileKeyIndexes.get(fileKey) || [];
+    indexes.push(index);
+    fileKeyIndexes.set(fileKey, indexes);
+  });
 
   const emitProgress = () => {
     const total = fileProgress.reduce((sum, item) => sum + item, 0);
@@ -116,21 +162,39 @@ export async function uploadImagesToCloudinary(files, { cache, onProgress } = {}
         };
       }
 
-      const uploaded = await uploadSingleImage(file, config, (percent) => {
-        fileProgress[index] = percent;
-        emitProgress();
-      });
+      let uploadPromise = pendingUploads.get(fileKey);
 
-      const image = {
-        url: uploaded.secure_url,
-        altText: file.name || `property image ${index + 1}`,
-        isPrimary: index === 0,
-      };
+      if (!uploadPromise) {
+        uploadPromise = uploadSingleImage(file, config, (percent) => {
+          (fileKeyIndexes.get(fileKey) || [index]).forEach((progressIndex) => {
+            fileProgress[progressIndex] = percent;
+          });
+          emitProgress();
+        })
+          .then((uploaded) => {
+            const image = {
+              url: uploaded.secure_url,
+              altText: file.name || `property image ${index + 1}`,
+            };
 
-      cache?.set(fileKey, image);
+            cache?.set(fileKey, image);
+            return image;
+          })
+          .finally(() => {
+            pendingUploads.delete(fileKey);
+          });
+
+        pendingUploads.set(fileKey, uploadPromise);
+      }
+
+      const uploadedImage = await uploadPromise;
       fileProgress[index] = 100;
       emitProgress();
-      return image;
+
+      return {
+        ...uploadedImage,
+        isPrimary: index === 0,
+      };
     })
   );
 

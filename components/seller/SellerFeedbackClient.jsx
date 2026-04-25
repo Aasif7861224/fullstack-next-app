@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 export default function SellerFeedbackClient({ data, status }) {
-  const router = useRouter();
+  const router = useLoaderRouter();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [priority, setPriority] = useState("medium");

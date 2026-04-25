@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useLoaderRouter } from "@/components/site/useLoaderRouter";
 
 export default function HeroSearch() {
-  const router = useRouter();
+  const router = useLoaderRouter();
   const [form, setForm] = useState({
     q: "",
     city: "",
